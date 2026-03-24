@@ -16,8 +16,8 @@ function shortName(n = '') {
 
 function cplStyle(cpl) {
   if (!cpl) return { bg:'#f3f4f6', color:'#6b7280' };
-  if (cpl < 50)  return { bg:'#dcfce7', color:'#15803d' };
-  if (cpl < 100) return { bg:'#fef3c7', color:'#b45309' };
+  if (cpl < 81)  return { bg:'#dcfce7', color:'#15803d' };
+  if (cpl < 90)  return { bg:'#fef3c7', color:'#b45309' };
   return { bg:'#fee2e2', color:'#b91c1c' };
 }
 
@@ -214,8 +214,8 @@ export default function Dashboard() {
             </table>
           </div>
           <div style={{ padding:'10px 16px', borderTop:'1px solid #e5e7eb', fontSize:11, color:'#9ca3af', display:'flex', gap:20, flexWrap:'wrap' }}>
-            <span>🟢 Under $50 CPL</span>
-            <span>🟡 $50–$100 CPL</span>
+            <span>🟢 Under $81 CPL</span>
+            <span>🟡 $81–$89 CPL</span>
             <span>🔴 Over $100 CPL</span>
             <span style={{ marginLeft:'auto' }}>▼ = CPL improving (7d cheaper than 30d) &nbsp; ▲ = CPL getting worse</span>
           </div>
