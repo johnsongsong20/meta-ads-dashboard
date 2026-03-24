@@ -32,26 +32,33 @@ function parseInsight(row) {
 function buildUrl(token, accountId, window) {
   const fields = 'spend,actions,cost_per_action_type';
   const base = `https://graph.facebook.com/v25.0/act_${accountId}/insights?fields=${fields}&access_token=${token}`;
+
   if (window === 'last_4d') {
+    // Use explicit date range: today minus 4 days to today
     const today = new Date();
-    const from = new Date(today);
-    from.setDate(today.getDate() - 4);
+    const since = new Date(today);
+    since.setDate(today.getDate() - 4);
     const fmt = d => d.toISOString().split('T')[0];
-    const timeRange = encodeURIComponent(JSON.stringify({ since: fmt(from), until: fmt(today) }));
-    return `${base}&time_range=${timeRange}`;
+    return `${base}&time_range[since]=${fmt(since)}&time_range[until]=${fmt(today)}`;
   }
+
   return `${base}&date_preset=${window}`;
 }
 
 async function fetchInsight(token, accountId, window) {
-  const url = buildUrl(token, accountId, window);
-  const res = await fetch(url, { cache: 'no-store' });
-  const json = await res.json();
-  if (json.error) {
-    console.error(`Error ${accountId} ${window}:`, json.error.message);
+  try {
+    const url = buildUrl(token, accountId, window);
+    const res = await fetch(url, { cache: 'no-store' });
+    const json = await res.json();
+    if (json.error) {
+      console.error(`Error ${accountId} ${window}:`, json.error.message);
+      return null;
+    }
+    return json.data?.[0] || null;
+  } catch (e) {
+    console.error(`Fetch failed ${accountId} ${window}:`, e.message);
     return null;
   }
-  return json.data?.[0] || null;
 }
 
 export async function GET() {
