@@ -1,12 +1,23 @@
-const ACCOUNT_IDS = [
-  '1349375325729644','1295673481394132','994275598578038','393237196834489',
-  '897758539804899','1410162463800186','2037138286706045','1787689704985832',
-  '737984749099297','809005254637020','8970854159685706','985832763418355',
-  '1577035316347695','332564609711563','8401236283273004'
-];
+const ACCOUNT_NAMES = {
+  '1349375325729644': 'Southside Coatings',
+  '1295673481394132': 'Schultz Commercial Roofing',
+  '994275598578038':  'Absolute Roofing & Construction',
+  '393237196834489':  'Premier Roofing Systems',
+  '897758539804899':  'Premier Roof Solutions',
+  '1410162463800186': 'Lapp Roofing',
+  '2037138286706045': 'D&C Sprayfoam',
+  '1787689704985832': 'Great Lakes Spray Foam',
+  '737984749099297':  'Rooftiq',
+  '809005254637020':  'DNR Commercial Roofing',
+  '8970854159685706': 'NCT Skyview Roofing',
+  '985832763418355':  'RJ Future Roofing',
+  '1577035316347695': 'Weavers Roofing & Construction',
+  '332564609711563':  'cb roofing',
+  '8401236283273004': 'Redeemed Roofing Systems',
+};
 
-const WINDOWS = ['last_30d','last_14d','last_7d','last_4d'];
-const API = 'https://graph.facebook.com/v25.0';
+const ACCOUNT_IDS = Object.keys(ACCOUNT_NAMES);
+const WINDOWS = ['last_30d', 'last_14d', 'last_7d', 'last_4d'];
 
 function parseInsight(row) {
   if (!row) return { spend: 0, leads: 0, cpl: null };
@@ -20,46 +31,51 @@ function parseInsight(row) {
 
 async function fetchInsight(token, accountId, datePreset) {
   const fields = 'spend,actions,cost_per_action_type';
-  const res = await fetch(
-    `${API}/${accountId}/insights?fields=${fields}&date_preset=${datePreset}&access_token=${token}`,
-    { next: { revalidate: 0 } }
-  );
+  const url = `https://graph.facebook.com/v25.0/act_${accountId}/insights?fields=${fields}&date_preset=${datePreset}&access_token=${token}`;
+  
+  const res = await fetch(url, { cache: 'no-store' });
   const json = await res.json();
-  if (json.error) return null;
+  
+  if (json.error) {
+    console.error(`Error fetching ${accountId} ${datePreset}:`, json.error.message);
+    return null;
+  }
   return json.data?.[0] || null;
-}
-
-async function fetchName(token, accountId) {
-  const res = await fetch(`${API}/${accountId}?fields=name&access_token=${token}`, { next: { revalidate: 3600 } });
-  const json = await res.json();
-  return json.name || accountId;
 }
 
 export async function GET() {
   const token = process.env.META_TOKEN;
+  
   if (!token) {
     return Response.json({ error: 'META_TOKEN env var not set' }, { status: 500 });
   }
 
   try {
-    // Fetch names + all window data in parallel
-    const [names, ...windowResults] = await Promise.all([
-      Promise.all(ACCOUNT_IDS.map(id => fetchName(token, id))),
-      ...WINDOWS.map(w =>
-        Promise.all(ACCOUNT_IDS.map(id => fetchInsight(token, id, w)))
-      )
-    ]);
+    // Fetch all accounts x all windows in parallel
+    const allFetches = ACCOUNT_IDS.flatMap(id =>
+      WINDOWS.map(w => fetchInsight(token, id, w).then(data => ({ id, window: w, data: parseInsight(data) })))
+    );
 
-    const accounts = ACCOUNT_IDS.map((id, i) => {
-      const windows = {};
-      WINDOWS.forEach((w, wi) => {
-        windows[w] = parseInsight(windowResults[wi][i]);
-      });
-      return { id, name: names[i], windows };
-    });
+    const results = await Promise.all(allFetches);
 
+    // Group by account
+    const accountMap = {};
+    for (const { id, window, data } of results) {
+      if (!accountMap[id]) {
+        accountMap[id] = {
+          id,
+          name: ACCOUNT_NAMES[id] || id,
+          windows: {}
+        };
+      }
+      accountMap[id].windows[window] = data;
+    }
+
+    const accounts = Object.values(accountMap);
     return Response.json({ accounts, fetchedAt: new Date().toISOString() });
+
   } catch (e) {
+    console.error('Fetch error:', e);
     return Response.json({ error: e.message }, { status: 500 });
   }
 }
